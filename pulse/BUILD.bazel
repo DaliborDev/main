@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "pulse",
+    srcs = glob(["**/*.go"]),
+#    importpath = "github.com/DaliborDev/monorepo/pulse",
+    visibility = ["//visibility:__subpackages__"],
+    deps = [
+#        "//pulse/internal",
+    ],
+)
+
+go_binary(
+    name = "run",
+    data = glob([
+        "files/*",
+    ]),
+    embed = [
+        ":pulse",
+    ],
+)

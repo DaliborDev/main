@@ -1,0 +1,5 @@
+.ijwb
+bazel-bin
+bazel-main
+bazel-out
+bazel-testlogs
