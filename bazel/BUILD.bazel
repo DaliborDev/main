@@ -1,0 +1,9 @@
+load("//bazel:rules.bzl", "go_stdlib")
+
+# go_stdlib builds the Go standard library.
+# This rule should only be instantiated once, here.
+# All other Go rules have a hidden dependency on this target.
+go_stdlib(
+    name = "stdlib",
+    visibility = ["//visibility:public"],
+)
