@@ -46,7 +46,7 @@ go_binary = rule(
   doc = "Builds an executable program from Go source code",
   executable = True
 )
-  
+
 def _go_stdlib_impl(ctx):
     # Declare two outputs: an importcfg file, and a packages directory.
     # Then build them both with go_build_stdlib. See the explanation there.
