@@ -1,5 +1,21 @@
 load(":actions.bzl", "go_build_stdlib", "go_compile", "go_link")
 
+
+########################################################################################
+#                                                                             
+#       88                       88                                                  
+#       88                       88                                                  
+#       88                       88                                                  
+#       88,dPPYba,    ,adPPYba,  88  8b,dPPYba,    ,adPPYba,  8b,dPPYba,  ,adPPYba,  
+#       88P'    "8a  a8P_____88  88  88P'    "8a  a8P_____88  88P'   "Y8  I8[    ""  
+#       88       88  8PP"""""""  88  88       d8  8PP"""""""  88           `"Y8ba,   
+#       88       88  "8b,   ,aa  88  88b,   ,a8"  "8b,   ,aa  88          aa    ]8I  
+#       88       88   `"Ybbd8"'  88  88`YbbdP"'    `"Ybbd8"'  88          `"YbbdP"'  
+#                                    88                                              
+#                                    88                                              
+#
+########################################################################################
+
 def _go_binary_impl(ctx):
   # Declare an output file for the main package and compile it from srcs. All
   # our output files will start with a prefix to avoid conflicting with
@@ -32,6 +48,33 @@ def _go_binary_impl(ctx):
     executable = executable,
   )]
 
+def _go_stdlib_impl(ctx):
+    # Declare two outputs: an importcfg file, and a packages directory.
+    # Then build them both with go_build_stdlib. See the explanation there.
+    prefix = ctx.label.name + "%/"
+    importcfg = ctx.actions.declare_file(prefix + "importcfg")
+    packages = ctx.actions.declare_directory(prefix + "packages")
+    go_build_stdlib(
+        ctx,
+        out_importcfg = importcfg,
+        out_packages = packages,
+    )
+    return [DefaultInfo(files = depset([importcfg, packages]))]
+
+
+############################################################################
+#
+#       88888888ba                88                                                                                                           
+#       88      "8b               88                                                                                                           
+#       88      ,8P               88                                                                                                           
+#       88aaaaaa8P'  88       88  88   ,adPPYba,  ,adPPYba,                                                                                    
+#       88""""88'    88       88  88  a8P_____88  I8[    ""                                                                                    
+#       88    `8b    88       88  88  8PP"""""""   `"Y8ba,                                                                                     
+#       88     `8b   "8a,   ,a88  88  "8b,   ,aa  aa    ]8I                                                                                    
+#       88      `8b   `"YbbdP'Y8  88   `"Ybbd8"'  `"YbbdP"'                                                                                    
+#
+############################################################################
+
 go_binary = rule(
   implementation = _go_binary_impl,
   attrs = {
@@ -46,19 +89,6 @@ go_binary = rule(
   doc = "Builds an executable program from Go source code",
   executable = True
 )
-
-def _go_stdlib_impl(ctx):
-    # Declare two outputs: an importcfg file, and a packages directory.
-    # Then build them both with go_build_stdlib. See the explanation there.
-    prefix = ctx.label.name + "%/"
-    importcfg = ctx.actions.declare_file(prefix + "importcfg")
-    packages = ctx.actions.declare_directory(prefix + "packages")
-    go_build_stdlib(
-        ctx,
-        out_importcfg = importcfg,
-        out_packages = packages,
-    )
-    return [DefaultInfo(files = depset([importcfg, packages]))]
 
 # go_stdlib is an internal rule that compiles the Go standard library
 # using source files and tools from a downloaded Go distribution.
