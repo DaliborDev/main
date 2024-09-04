@@ -1,4 +1,3 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
 load("//bazel:def.bzl", "go_binary")
 
 go_binary(
@@ -7,23 +6,3 @@ go_binary(
     "main.go",
   ]
 )
-
-# go_library(
-#     name = "brain_source",
-#     srcs = glob(["**/*.go"]),
-# #    importpath = "github.com/DaliborDev/monorepo/pulse",
-#     visibility = ["//visibility:__subpackages__"],
-#     deps = [
-# #        "//pulse/internal",
-#     ],
-# )
-
-# go_binary(
-#     name = "run",
-#     data = glob([
-#         "files/*",
-#     ]),
-#     embed = [
-#         ":brain_source",
-#     ],
-# )
