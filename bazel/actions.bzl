@@ -1,57 +1,95 @@
 load("@bazel_skylib//lib:shell.bzl", "shell")
 
 
-def go_compile(ctx, *, srcs, stdlib, out):
-  """Compiles a single Go package from sources.
+def go_compile(ctx, *, importpath, srcs, stdlib, out, deps):
+  dep_importcfg_text = "\n".join([
+    "packagefile {importpath}={filepath}".format(
+      importpath=dep.info.importpath,
+      filepath=dep.info.archive.path,
+    )
+    for dep in deps
+  ])
 
-  Args:
-      ctx: analysis context.
-      srcs: list of source Files to be compiled.
-      stdlib: list containing an importcfg file and a package directory
-          for the standard library.
-      out: output .a file. Should have the importpath as a suffix,
-          for example, library "example.com/foo" should have the path
-          "somedir/example.com/foo.a".
-  """
-  stdlib_importcfg = stdlib[0]
-  cmd = "go tool compile -o {out} -importcfg {importcfg} -- {srcs}".format(
+  command = """
+set -e
+export GOPATH=/dev/null  # suppress warning
+importcfg=$(mktemp)
+cat >"${{importcfg}}" {stdlib_importcfg} - <<'EOF'
+{dep_importcfg_text}
+EOF
+go tool compile -o {out} -p {importpath} -importcfg "${{importcfg}}" -- {srcs}
+rm "${{importcfg}}"
+  """.format(
+    stdlib_importcfg = shell.quote(stdlib.importcfg.path),
+    dep_importcfg_text = dep_importcfg_text,
     out = shell.quote(out.path),
-    importcfg = shell.quote(stdlib_importcfg.path),
+    importpath = shell.quote(importpath),
     srcs = " ".join([shell.quote(src.path) for src in srcs]),
   )
 
+  inputs = depset(
+    direct = srcs + [dep.info.archive for dep in deps],
+    transitive = [stdlib.files],
+  )
+
+  # stdlib_importcfg = stdlib[0]
+  # cmd = "go tool compile -o {out} -importcfg {importcfg} -- {srcs}".format(
+  #   out = shell.quote(out.path),
+  #   importcfg = shell.quote(stdlib_importcfg.path),
+  #   srcs = " ".join([shell.quote(src.path) for src in srcs]),
+  # )
+
   ctx.actions.run_shell(
     outputs = [out],
-    inputs = srcs + stdlib,
-    command = cmd,
-    env = {"GOPATH": "/dev/null"},  # suppress warning
+    inputs = inputs,
+    command = command,
     mnemonic = "GoCompile",
     use_default_shell_env = True,
   )
 
 
-def go_link(ctx, *, out, stdlib, main):
-  """Links a Go executable.
-
-  Args:
-      ctx: analysis context.
-      out: output executable file.
-      stdlib: list containing an importcfg file and a package directory
-          for the standard library.
-      main: archive file for the main package.
-  """
-  stdlib_importcfg = stdlib[0]
-  cmd = "go tool link -o {out} -importcfg {importcfg} -- {main}".format(
-    out = shell.quote(out.path),
-    importcfg = shell.quote(stdlib_importcfg.path),
-    main = shell.quote(main.path),
+def go_link(ctx, *, out, stdlib, main, deps):
+  # stdlib_importcfg = stdlib[0]
+  # cmd = "go tool link -o {out} -importcfg {importcfg} -- {main}".format(
+  #   out = shell.quote(out.path),
+  #   importcfg = shell.quote(stdlib_importcfg.path),
+  #   main = shell.quote(main.path),
+  # )
+  deps_set = depset(
+    direct = [d.info for d in deps],
+    transitive = [d.deps for d in deps],
   )
+  dep_importcfg_text = "\n".join([
+    "packagefile {importpath}={filepath}".format(
+        importpath = dep.importpath,
+        filepath = dep.archive.path,
+    )
+    for dep in deps_set.to_list()
+  ])
+  command = """
+set -e
+export GOPATH=/dev/null  # suppress warning
+importcfg=$(mktemp)
+cat >"${{importcfg}}" {stdlib_importcfg} - <<'EOF'
+{dep_importcfg_text}
+EOF
+go tool link -o {out} -importcfg "${{importcfg}}" -- {main}
+""".format(
+      stdlib_importcfg = shell.quote(stdlib.importcfg.path),
+      dep_importcfg_text = dep_importcfg_text,
+      out = shell.quote(out.path),
+      main = shell.quote(main.path),
+    )
+  inputs = depset(
+    direct = [main] + [d.archive for d in deps_set.to_list()],
+    transitive = [stdlib.files]
+  )
+
 
   ctx.actions.run_shell(
     outputs = [out],
-    inputs = [main] + stdlib,
-    command = cmd,
-    env = {"GOPATH": "/dev/null"},  # suppress warning
+    inputs = inputs,
+    command = command,
     mnemonic = "GoLink",
     use_default_shell_env = True
   )

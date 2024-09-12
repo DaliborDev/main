@@ -1,4 +1,5 @@
 load(":actions.bzl", "go_build_stdlib", "go_compile", "go_link")
+load(":providers.bzl", "GoLibraryInfo", "GoStdLibInfo")
 
 
 ########################################################################################
@@ -16,15 +17,51 @@ load(":actions.bzl", "go_build_stdlib", "go_compile", "go_link")
 #
 ########################################################################################
 
+def _go_library_impl(ctx):
+  archive = ctx.actions.declare_file("{name}_/pkg.a".format(name=ctx.label.name))
+  go_compile(
+    ctx,
+    importpath = ctx.attr.importpath,
+    srcs=ctx.files.srcs,
+    stdlib = ctx.attr._stdlib[GoStdLibInfo],
+    deps = [dep[GoLibraryInfo] for dep in ctx.attr.deps],
+    out=archive,
+  )
+
+  # deps = depset(
+  #   direct=[dep[GoLibraryInfo].info for dep in ctx.attr.deps],
+  #   transitive=[dep[GoLibraryInfo].deps for dep in ctx.attr.deps],
+  # )
+
+  return [
+    DefaultInfo(files=depset([archive])),
+    GoLibraryInfo(
+      info=struct(
+        importpath=ctx.attr.importpath,
+        archive=archive,
+      ),
+      deps=depset(
+        direct = [dep[GoLibraryInfo].info for dep in ctx.attr.deps],
+        transitive = [dep[GoLibraryInfo].deps for dep in ctx.attr.deps],
+      ),
+      files=depset(
+        direct=[archive],
+        transitive=[dep[GoLibraryInfo].files for dep in ctx.attr.deps],
+      ),
+    ),
+  ]
+
 def _go_binary_impl(ctx):
   # Declare an output file for the main package and compile it from srcs. All
   # our output files will start with a prefix to avoid conflicting with
   # other rules.
-  main_archive = ctx.actions.declare_file("{name}_/main.a".format(name = ctx.label.name))
+  main_archive = ctx.actions.declare_file("{name}_/main.a".format(name=ctx.label.name))
   go_compile(
     ctx,
+    importpath = "main",
     srcs = ctx.files.srcs,
-    stdlib = ctx.files._stdlib,
+    stdlib = ctx.attr._stdlib[GoStdLibInfo],
+    deps = [dep[GoLibraryInfo] for dep in ctx.attr.deps],
     out = main_archive,
   )
 
@@ -36,7 +73,8 @@ def _go_binary_impl(ctx):
   go_link(
     ctx,
     main = main_archive,
-    stdlib = ctx.files._stdlib,
+    stdlib = ctx.attr._stdlib[GoStdLibInfo],
+    deps = [dep[GoLibraryInfo] for dep in ctx.attr.deps],
     out = executable,
   )
 
@@ -59,7 +97,14 @@ def _go_stdlib_impl(ctx):
         out_importcfg = importcfg,
         out_packages = packages,
     )
-    return [DefaultInfo(files = depset([importcfg, packages]))]
+    return [
+      DefaultInfo(files = depset([importcfg, packages])),
+      GoStdLibInfo(
+        importcfg=importcfg,
+        packages=packages,
+        files=depset([importcfg,packages]),
+      ),
+    ]
 
 
 ############################################################################
@@ -82,12 +127,36 @@ go_binary = rule(
       allow_files = [".go"],
       doc = "Source files to compile for the main package of this binary",
     ),
+    "deps": attr.label_list(
+      providers = [GoLibraryInfo],
+      doc = "Direct dependencies of the binary",
+    ),
     "_stdlib": attr.label(
       default = "//bazel:stdlib",
     ),
   },
   doc = "Builds an executable program from Go source code",
   executable = True
+)
+
+go_library = rule(
+  implementation=_go_library_impl,
+  attrs = {
+    "srcs": attr.label_list(
+      allow_files = [".go"],
+    ),
+    "importpath": attr.string(
+      mandatory = True,
+    ),
+    "deps": attr.label_list(
+      providers = [GoLibraryInfo]
+    ),
+    "_stdlib": attr.label(
+      default = "//bazel:stdlib",
+      providers = [GoStdLibInfo],
+    ),
+  },
+  provides=[GoLibraryInfo]
 )
 
 # go_stdlib is an internal rule that compiles the Go standard library
@@ -113,4 +182,5 @@ go_binary = rule(
 go_stdlib = rule(
     implementation = _go_stdlib_impl,
     doc = "Builds the Go standard library",
+    provides = [GoStdLibInfo],
 )

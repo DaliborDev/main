@@ -1,0 +1,8 @@
+load("//bazel:def.bzl", "go_library")
+
+go_library(
+  name = "lib",
+  srcs = glob(["*.go"]),
+  deps = [],
+  importpath = "github.com/DaliborDev/main/powerhouse"
+)
